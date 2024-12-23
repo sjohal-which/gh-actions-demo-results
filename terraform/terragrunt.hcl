@@ -1,14 +1,9 @@
 locals {
   snowflake = {
     id = get_env("SNOWFLAKE_ACCOUNT_ID")
-    region = get_env("SNOWFLAKE_ACCOUNT_REGION", "eu-west-1")
+    region = get_env("SNOWFLAKE_ACCOUNT_REGION", "eu-west-2")
+    authenticator = get_env("SNOWFLAKE_AUTHENTICATOR", "JWT")
   }
-
-  # Terraform configuration
-  terraform_state_dynamodb_table = "which-datahubprod-account-terraform-state-lock"
-  terraform_state_bucket         = "terraform-which-datahubprod"
-  terraform_state_file           = "datamesh-domain/${lower(local.snowflake.id)}/terraform.tfstate"
-
 }
 
 generate "backend" {
@@ -16,42 +11,38 @@ generate "backend" {
   if_exists = "overwrite_terragrunt"
   contents = <<EOF
 provider "aws" {
-  region = "eu-west-1"
-
-  default_tags {
-    tags = {
-      Environment    = "prod"
-      Owner          = "Data Ops Squad"
-      ManagedBy      = "terraform"
-      ManagedIn      = "https://github.com/whichdigital/REPLACE_VALUE"
-      TerraformState = "${local.terraform_state_bucket}/${local.terraform_state_file}"
-    }
-  }
+  region = "eu-west-2"
+  alias = "datahub"
 }
 
 terraform {
-  backend "s3" {
-    bucket         = "terraform-which-datahubprod"
-    key            = "datamesh-domain/${lower(local.snowflake.id)}.tfstate"
-    region         = "eu-west-1"
-    dynamodb_table = "which-datahubprod-account-terraform-state-lock"
+  backend "local" {
+    path = "terraform.tfstate"
   }
 }
 EOF
 }
 
 generate "providers" {
-  path      = "providers-snowflake.tf"
+  path      = "providers.tf"
   if_exists = "overwrite_terragrunt"
   contents  = <<EOF
-provider "snowflake" {
-  account       = "${local.snowflake.id}.${local.snowflake.region}"
-  role          = "W_ACCOUNTADMIN"
-  authenticator = "JWT"
+terraform {
+  required_providers {
+    snowflake = {
+      source  = "Snowflake-Labs/snowflake"
+      version = "~> 0.95.0"
+    }
+  }
 }
 
-locals {
-  snowflake_account = "${local.snowflake.id}.${local.snowflake.region}"
+provider "snowflake" {
+  role = "ACCOUNTADMIN"
+  account = "${local.snowflake.id}"
+  authenticator = "JWT"
+  #NB. use associated paired keys with this user otherwise get JWT_TOKEN_INVALID_PUBLIC_KEY_FINGERPRINT_MISMATCH
+  user = "tf-snow"
 }
+
 EOF
 }
