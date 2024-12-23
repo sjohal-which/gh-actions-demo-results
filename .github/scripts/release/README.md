@@ -1,3 +1,7 @@
+# Setup
+1. Add `GITHUB_TOKEN` to the repository secrets.
+2. Remove any invalid tags i.e. which don't conform to the semantic versioning format e.g. `v1.0.0`.
+
 # Troubleshooting
 1. Remove any malformed tags e.g. `v1.0.0-rc1` and restart workflow.
 
