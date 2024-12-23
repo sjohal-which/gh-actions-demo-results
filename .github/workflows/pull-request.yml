@@ -43,7 +43,7 @@ permissions:
 jobs:
 
   validate:
-    name: Validate Terraform
+    name: Validate
     runs-on: ubuntu-latest  # Lighter job can use standard runner
     timeout-minutes: 15     # Validation usually takes less time
     defaults:
@@ -177,10 +177,9 @@ jobs:
 
             Full plan details can be found in this [artifacts link](${process.env.ARTIFACT_URL})
 
-            Here's the summary of changes:
-            \`\`\`
+            <details><summary>Show Plan</summary>
             ${fs.readFileSync('terraform/CHANGELOG.md', 'utf8')}
-            \`\`\`
+            </details>
 
             *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Workflow: \`${{ github.workflow }}\`*`;
 
