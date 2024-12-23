@@ -43,7 +43,7 @@ permissions:
 jobs:
 
   validate:
-    name: Validate Terraform
+    name: Validate
     runs-on: ubuntu-latest  # Lighter job can use standard runner
     timeout-minutes: 15     # Validation usually takes less time
     defaults:
@@ -101,6 +101,12 @@ jobs:
 #          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT }}:role/${{ env.AWS_ROLE }}
 #          role-session-name: GithubActions-${{ env.REPO_NAME }}-${{ github.workflow }}-${{ github.run_id }}
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
       - name: Generate Plan
         id: plan
         uses: gruntwork-io/terragrunt-action@v2
@@ -123,7 +129,6 @@ jobs:
           jq '[.resource_changes[] | {action: .change.actions[0], resource: .address}] | to_entries[] | select(.value.action != "no-op") | "\(.key). **\(.value.action)** \(.value.resource)"' -r tfplan.json > changes.txt
 
           cat << EOT > $CHANGELOG
-          ## Changes:
 
           *Auto-generated*
 
@@ -171,11 +176,12 @@ jobs:
 
             Full plan details can be found in this [artifacts link](${process.env.ARTIFACT_URL})
 
-            Here's the summary of changes:
-            \`\`\`
+            <details><summary>Show Plan</summary>
+            
             ${fs.readFileSync('terraform/CHANGELOG.md', 'utf8')}
-            \`\`\`
-
+            
+            </details>
+            
             *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Workflow: \`${{ github.workflow }}\`*`;
 
             await github.rest.issues.createComment({
