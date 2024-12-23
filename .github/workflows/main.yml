@@ -1,10 +1,14 @@
-name: apply
+name: Apply Terraform, tag and generate release notes
 
 # Only do this on the main branch
 on:
   push:
     branches:
       - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 # Setup some environment variables specific to this workflow
 env:
@@ -38,6 +42,7 @@ jobs:
   # This is where we'll be managing the infrastructure using terraform.
   infra:
     runs-on: self-hosted
+    if: false #TODO reinstate
 
     steps:
       - name: Checkout repo
@@ -65,3 +70,70 @@ jobs:
           tg_version: ${{ env.TG_VERSION }}
           tg_dir: terraform
           tg_command: apply
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest  # Lighter job can use standard runner
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0 # Fetch entire history to e.g. get tags
+
+      - name: Get latest tag
+        id: get-latest-tag
+        run: |
+          chmod +x .github/scripts/release/0-get-latest-tag.sh
+          .github/scripts/release/0-get-latest-tag.sh
+          cat $GITHUB_OUTPUT
+
+      - name: Determine version bump type
+        id: bump-type
+        run: |
+          chmod +x .github/scripts/release/1-determine-bump-type.sh
+          .github/scripts/release/1-determine-bump-type.sh
+          cat $GITHUB_OUTPUT
+
+      - name: Bump version
+        if: steps.bump-type.outputs.BUMP_TYPE != 'none'
+        id: bump-version
+        run: |
+          chmod +x .github/scripts/release/2-bump-version.sh
+          .github/scripts/release/2-bump-version.sh "${{ steps.get-latest-tag.outputs.LATEST_TAG }}" "${{ steps.bump-type.outputs.BUMP_TYPE }}"
+          cat $GITHUB_OUTPUT
+
+      - name: Generate Release Notes
+        if: steps.bump-type.outputs.BUMP_TYPE != 'none'
+        id: release_notes
+        shell: bash
+        run: |
+          chmod +x .github/scripts/release/3-generate-release-notes.sh
+          .github/scripts/release/3-generate-release-notes.sh
+
+      - name: Create and push tag
+        if: steps.bump-type.outputs.BUMP_TYPE != 'none'
+        run: |
+          chmod +x .github/scripts/release/4-create-tag.sh
+          .github/scripts/release/4-create-tag.sh "${{ steps.bump-version.outputs.NEW_VERSION }}"
+          cat $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        if: steps.bump-type.outputs.BUMP_TYPE != 'none'
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: ./release-notes.md
+          tag_name: ${{ steps.bump-version.outputs.NEW_VERSION }}
+          repository: ${{ github.repository }}
+          token: ${{ env.GITHUB_TOKEN }}
+
+      - name: Setup Debug Session
+        if: failure()
+        uses: mxschmitt/action-tmate@v3
+        with:
+          detached: true
+          limit-access-to-actor: true
