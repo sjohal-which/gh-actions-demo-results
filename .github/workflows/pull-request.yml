@@ -178,12 +178,12 @@ jobs:
             Full plan details can be found in this [artifacts link](${process.env.ARTIFACT_URL})
 
             <details><summary>Show Plan</summary>
-            \`\`\`
+            
+            \`\`\`\n
             ${fs.readFileSync('terraform/CHANGELOG.md', 'utf8')}
             \`\`\`
+            
             </details>
-
-            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Workflow: \`${{ github.workflow }}\`*`;
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
