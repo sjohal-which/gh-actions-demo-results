@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "snowflake-domain-template"
+version = "0.1.0"
+description = ""
+authors = ["Matthew Denner <matthew.denner@which.co.uk>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+dbt-core = "^1.7.13"
+dbt-snowflake = "^1.7.3"
+dbt-duckdb = "^1.7.4"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

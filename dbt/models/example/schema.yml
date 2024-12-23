@@ -1,0 +1,33 @@
+version: 2
+
+models:
+  - name: test_masking
+    description: "A table that can be used for testing masking"
+    columns:
+      - name: id
+        description: "The primary key for this table"
+        tests:
+          - unique
+          - not_null
+
+      - name: name
+        description: "The name of the individual"
+        tests:
+          - not_null
+        meta:
+          database_tags:
+            secure_data: secure
+
+  - name: test_masking_impact
+    description: "A table that can shows the impact of masking"
+    columns:
+      - name: id
+        description: "The primary key for this table"
+        tests:
+          - unique
+          - not_null
+
+      - name: masked_name
+        description: "The apparent name of the individual"
+        tests:
+          - not_null

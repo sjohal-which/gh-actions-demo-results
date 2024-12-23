@@ -1,0 +1,67 @@
+name: apply
+
+# Only do this on the main branch
+on:
+  push:
+    branches:
+      - main
+
+# Setup some environment variables specific to this workflow
+env:
+  AWS_REGION: "eu-west-1"
+  AWS_ACCOUNT: "094555056740"
+  AWS_ROLE: "github-actions-datamesh-domains"
+  TF_VERSION: "1.5.7"
+  TG_VERSION: "0.45.2"
+  SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+  SNOWFLAKE_ACCOUNT_ID: ${{ secrets.SNOWFLAKE_ACCOUNT_ID }}
+  SNOWFLAKE_USER: "CI_CD"
+
+  # Expose the GCP credentials
+  GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+
+  # To have access to our repositories we need to ensure that the SSH based auth in our
+  # terraform, is rewritten to use HTTP with a PAT.
+  W_GITHUB_TOKEN: ${{ secrets.W_GITHUB_TOKEN }}
+  INPUT_PRE_EXEC_1: |
+    git config --global url."https://oauth2:${W_GITHUB_TOKEN}@github.com/whichdigital".insteadOf "ssh://git@github.com/whichdigital"
+
+# We need some permissions for this workflow.
+permissions:
+  id-token: write
+  contents: read
+
+# Let's get the party started ...
+# We're using the terragrunt action: https://github.com/gruntwork-io/terragrunt-action
+jobs:
+
+  # This is where we'll be managing the infrastructure using terraform.
+  infra:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT }}:role/${{ env.AWS_ROLE }}
+          role-session-name: GithubActions-${{ env.REPO_NAME }}-${{ github.workflow }}-${{ github.run_id }}
+
+      - name: Plan IaC
+        uses: gruntwork-io/terragrunt-action@v2
+        with:
+          tf_version: ${{ env.TF_VERSION }}
+          tg_version: ${{ env.TG_VERSION }}
+          tg_dir: terraform
+          tg_command: plan
+
+      - name: Apply IaC
+        uses: gruntwork-io/terragrunt-action@v2
+        with:
+          tf_version: ${{ env.TF_VERSION }}
+          tg_version: ${{ env.TG_VERSION }}
+          tg_dir: terraform
+          tg_command: apply

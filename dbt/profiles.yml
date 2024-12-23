@@ -1,0 +1,41 @@
+snowflake_domain_template:
+  target: dev
+
+  outputs:
+    # This is the base environment that all other environments extend from. It has the
+    # core details that are the same across all of them, i.e. production & development
+    # live in the same account, use the same auth system, but different in some other
+    # details.
+    base: &base
+      type: snowflake
+      threads: 1
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT_ID') }}.{{ env_var('SNOWFLAKE_ACCOUNT_REGION', 'eu-west-1') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'PUBLIC') }}"
+
+    # Development environment uses smaller warehouse & different database
+    dev: 
+      <<: *base
+
+      # TODO: when we have SAML setup we will need to use this:
+      # authenticator: externalbrowser
+      private_key: "{{ env_var('SNOWFLAKE_PRIVATE_KEY') }}"
+
+      # TODO: you should probably change these values as appropriate
+      warehouse: DBT_COMPUTE
+      database: DBT_TEST
+      schema: PUBLIC
+
+    # Production environment.
+    prod:
+      <<: *base
+      private_key: "{{ env_var('SNOWFLAKE_PRIVATE_KEY') }}"
+
+      # TODO: you should probably change these values as appropriate
+      warehouse: DBT_COMPUTE
+      database: DBT_TEST
+      schema: PUBLIC
+
+        # Reporting ... using DuckDB: https://duckdb.org/
+    reporting:
+      type: duckdb

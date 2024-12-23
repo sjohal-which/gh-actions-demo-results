@@ -1,0 +1,8 @@
+packages:
+  # Additional DBT testing & expectations
+  - package: calogica/dbt_expectations
+    version: [">=0.10.0", "<0.11.0"]
+
+  # DBT standards adherence
+  - package: dbt-labs/dbt_project_evaluator
+    version: 0.11.0

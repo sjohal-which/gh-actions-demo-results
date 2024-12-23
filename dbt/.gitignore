@@ -1,0 +1,7 @@
+# DBT related stuff
+target/
+dbt_packages/
+logs/
+
+# Snowflake DBT stuff
+.user.yml
