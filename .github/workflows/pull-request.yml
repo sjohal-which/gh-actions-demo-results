@@ -101,6 +101,12 @@ jobs:
 #          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT }}:role/${{ env.AWS_ROLE }}
 #          role-session-name: GithubActions-${{ env.REPO_NAME }}-${{ github.workflow }}-${{ github.run_id }}
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
       - name: Generate Plan
         id: plan
         uses: gruntwork-io/terragrunt-action@v2
