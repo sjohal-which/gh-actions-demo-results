@@ -3,6 +3,7 @@
 
 # Test
 ```bash
+cd-gitroot && touch fake-commit
 git checkout main &&
 echo "" >> fake-commit && git add -A && git commit -m 'feat!: first release|major' &&
 echo "" >> fake-commit && git add -A && git commit -m 'fix: add new roles|patch' &&
