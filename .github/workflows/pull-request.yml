@@ -1,7 +1,16 @@
-name: apply
+name: Validate & Generate Plan
+run-name: Plan on PR by @${{ github.actor }}
+description: |
+  This workflow validates the terraform code and generates a plan for the infrastructure changes.
+  It is triggered on pull requests to the main branch.
 
 # Only do this on a pull request, where we just do the plan to see what would happen.
 on: [pull_request]
+
+# Concurrency settings to ensure that we don't run multiple instances of this workflow at the same time.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 # Setup some environment variables specific to this workflow
 env:
@@ -27,30 +36,148 @@ env:
 permissions:
   id-token: write
   contents: read
+  pull-requests: write
 
 # Let's get the party started ...
 # We're using the terragrunt action: https://github.com/gruntwork-io/terragrunt-action
 jobs:
 
-  # This is where we'll be managing the infrastructure using terraform.
-  infra:
-    runs-on: self-hosted
+  validate:
+    name: Validate Terraform
+    runs-on: ubuntu-latest  # Lighter job can use standard runner
+    timeout-minutes: 15     # Validation usually takes less time
+    defaults:
+      run:
+        working-directory: terraform
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
         with:
-          aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT }}:role/${{ env.AWS_ROLE }}
-          role-session-name: GithubActions-${{ env.REPO_NAME }}-${{ github.workflow }}-${{ github.run_id }}
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
 
-      - name: Plan IaC
+      - name: Validate Terraform
+        id: validate
         uses: gruntwork-io/terragrunt-action@v2
         with:
           tf_version: ${{ env.TF_VERSION }}
           tg_version: ${{ env.TG_VERSION }}
           tg_dir: terraform
-          tg_command: plan
+          tg_command: validate
+
+      #TODO add another step when we start testing terraform code
+
+      # use when not using self-hosted runner
+      - name: Setup Debug Session
+        if: failure()
+        uses: mxschmitt/action-tmate@v3
+        with:
+          detached: true
+          limit-access-to-actor: true
+
+  # This is where we'll be managing the infrastructure using terraform.
+  infra:
+    name: Generate Plan
+    needs: validate
+    runs-on: ubuntu-latest #TODO revert to self-hosted
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      #TODO reinstate
+#      - name: Configure AWS credentials
+#        uses: aws-actions/configure-aws-credentials@v4
+#        with:
+#          aws-region: ${{ env.AWS_REGION }}
+#          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT }}:role/${{ env.AWS_ROLE }}
+#          role-session-name: GithubActions-${{ env.REPO_NAME }}-${{ github.workflow }}-${{ github.run_id }}
+
+      - name: Generate Plan
+        id: plan
+        uses: gruntwork-io/terragrunt-action@v2
+        with:
+          tf_version: ${{ env.TF_VERSION }}
+          tg_version: ${{ env.TG_VERSION }}
+          tg_dir: terraform
+          tg_command: plan -out=tfplan.binary
+        continue-on-error: true
+
+      - name: Convert and Upload Plan
+        if: steps.plan.outcome == 'success'
+        run: |
+          terraform show -json tfplan.binary > tfplan.json
+
+      - name: Summarize Changes
+        id: summarize-changes
+        run: |
+          # Parse and summarize changes
+          jq '[.resource_changes[] | {action: .change.actions[0], resource: .address}] | to_entries[] | select(.value.action != "no-op") | "\(.key). **\(.value.action)** \(.value.resource)"' -r tfplan.json > changes.txt
+
+          cat << EOT > $CHANGELOG
+          ## Changes:
+
+          *Auto-generated*
+
+          PR: https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}
+          EOT
+          cat changes.txt >> $CHANGELOG
+        working-directory:
+          terraform
+        env:
+          CHANGELOG: CHANGELOG.md
+          TZ: UTC  #Ensure consistent timestamps
+
+      - name: Upload Plan Artifact
+        if: steps.plan.outcome == 'success'
+        id: upload-artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-artifacts-${{ github.run_id }}
+          path: |
+            terraform/tfplan.json
+          retention-days: 5
+
+      - name: Update PR with Plan
+        if: steps.plan.outcome == 'success'
+        uses: actions/github-script@v7
+        env:
+          ARTIFACT_URL: ${{ steps.upload-artifact.outputs.artifact-url }}
+        with:
+          script: |
+            const fs = require('fs');
+            const planOutput = fs.readFileSync('terraform/tfplan.json', 'utf8');
+            const planSummary = JSON.parse(planOutput).resource_changes
+              .filter(change => change.change.actions[0] !== 'no-op')
+              .length;
+
+            let status = '✅ Plan generated successfully';
+            if (planSummary === 0) {
+              status = '✅ No changes. Infrastructure is up-to-date!';
+            }
+
+            const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/artifacts`;
+
+            const body = `### Terraform Plan Result
+            ${status}
+
+            Full plan details can be found in this [artifacts link](${process.env.ARTIFACT_URL})
+
+            Here's the summary of changes:
+            \`\`\`
+            ${fs.readFileSync('terraform/CHANGELOG.md', 'utf8')}
+            \`\`\`
+
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Workflow: \`${{ github.workflow }}\`*`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
