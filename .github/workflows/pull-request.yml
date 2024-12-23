@@ -129,7 +129,6 @@ jobs:
           jq '[.resource_changes[] | {action: .change.actions[0], resource: .address}] | to_entries[] | select(.value.action != "no-op") | "\(.key). **\(.value.action)** \(.value.resource)"' -r tfplan.json > changes.txt
 
           cat << EOT > $CHANGELOG
-          ## Changes:
 
           *Auto-generated*
 
