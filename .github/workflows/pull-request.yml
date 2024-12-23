@@ -179,9 +179,7 @@ jobs:
 
             <details><summary>Show Plan</summary>
             
-            \`\`\`\n
             ${fs.readFileSync('terraform/CHANGELOG.md', 'utf8')}
-            \`\`\`
             
             </details>
             
