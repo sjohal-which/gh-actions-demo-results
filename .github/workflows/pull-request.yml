@@ -183,7 +183,9 @@ jobs:
             ${fs.readFileSync('terraform/CHANGELOG.md', 'utf8')}
             \`\`\`
             
-            </details>;
+            </details>
+            
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Workflow: \`${{ github.workflow }}\`*`;
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
