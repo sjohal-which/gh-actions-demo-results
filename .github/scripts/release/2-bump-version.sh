@@ -18,4 +18,4 @@ case "$2" in
     ;;
 esac
 
-echo "NEW_VERSION=v${NEW_VERSION}" >> $GITHUB_OUTPUT
+echo "NEW_VERSION=${NEW_VERSION}" >> $GITHUB_OUTPUT
