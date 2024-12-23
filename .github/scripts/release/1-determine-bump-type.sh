@@ -37,4 +37,5 @@ if [[ $BUMP_TYPE != "none" ]]; then
   echo "BUMP_TYPE=${BUMP_TYPE}" >> $GITHUB_OUTPUT
 else
   echo "No valid conventional commits found. Skipping tag creation."
+  echo "BUMP_TYPE=v0.0.0" >> $GITHUB_OUTPUT # Default to v0.0.0 if no valid commits found on initial release
 fi
