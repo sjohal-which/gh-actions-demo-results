@@ -85,6 +85,9 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest #TODO revert to self-hosted
     timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: terraform
 
     steps:
       - name: Checkout repo
