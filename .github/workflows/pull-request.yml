@@ -183,7 +183,7 @@ jobs:
             ${fs.readFileSync('terraform/CHANGELOG.md', 'utf8')}
             \`\`\`
             
-            </details>
+            </details>;
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
